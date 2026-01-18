@@ -47,10 +47,6 @@ dependencies {
     implementation("com.github.pedroSG94.RootEncoder:library:2.6.7")
 
     // 2. RTMP 재생용 라이브러리 (ExoPlayer + RTMP Extension)
-//    val exoplayerVersion = "2.19.1"
-//    implementation("com.google.android.exoplayer:exoplayer:$exoplayerVersion")
-//    implementation("com.google.android.exoplayer:extension-rtmp:$exoplayerVersion")
-
     val media3_version = "1.9.0" // 최신 안정 버전
     // Media3 핵심 라이브러리
     implementation("androidx.media3:media3-exoplayer:$media3_version")
