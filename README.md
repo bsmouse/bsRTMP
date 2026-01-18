@@ -14,10 +14,10 @@
 * **RootEncoder (Pedro):** RTMP 송출 엔진
 * **SharedPreferences:** 설정값 저장 관리
 
-1. RTMP 송출용 라이브러리 (PedroSG94)
+1. **RTMP 송출용 라이브러리 (PedroSG94)**
   implementation("com.github.pedroSG94.RootEncoder:library:2.6.7")
 
-2. RTMP 재생용 라이브러리 (ExoPlayer + RTMP Extension)
+2. **RTMP 재생용 라이브러리 (ExoPlayer + RTMP Extension)**
   val media3_version = "1.9.0"
   implementation("androidx.media3:media3-exoplayer:$media3_version")
   implementation("androidx.media3:media3-ui:$media3_version")
