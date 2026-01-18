@@ -11,13 +11,7 @@
 ## 🛠 기술 스택
 * **Language:** Kotlin
 * **Media3:** 저지연 라이브 재생 (ExoPlayer 통합 버전)
-*   val media3_version = "1.9.0"
-    implementation("androidx.media3:media3-exoplayer:$media3_version")
-    implementation("androidx.media3:media3-ui:$media3_version")
-    implementation("androidx.media3:media3-datasource-rtmp:$media3_version")
-    implementation("androidx.media3:media3-common:$media3_version")
 * **RootEncoder (Pedro):** RTMP 송출 엔진
-* implementation("com.github.pedroSG94.RootEncoder:library:2.6.7")
 * **SharedPreferences:** 설정값 저장 관리
 
 ## ⚙️ 설정 방법
