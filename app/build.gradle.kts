@@ -1,12 +1,13 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
     alias(libs.plugins.android.application)
 }
 
 android {
     namespace = "com.example.bsrtmp"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.example.bsrtmp"
@@ -28,8 +29,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
@@ -48,9 +49,21 @@ dependencies {
 
     // 2. RTMP 재생용 라이브러리 (ExoPlayer + RTMP Extension)
     val media3_version = "1.9.0" // 최신 안정 버전
-    // Media3 핵심 라이브러리
     implementation("androidx.media3:media3-exoplayer:$media3_version")
     implementation("androidx.media3:media3-ui:$media3_version")
     implementation("androidx.media3:media3-datasource-rtmp:$media3_version")
     implementation("androidx.media3:media3-common:$media3_version")
+}
+
+androidComponents {
+    onVariants { variant ->
+        val date = SimpleDateFormat("yyyyMMdd").format(Date())
+        val newName = "DCCL_${variant.name}_$date.apk"
+
+        variant.outputs.forEach { output ->
+            if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
+                output.outputFileName = newName
+            }
+        }
+    }
 }

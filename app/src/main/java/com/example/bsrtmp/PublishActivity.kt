@@ -2,87 +2,120 @@ package com.example.bsrtmp
 
 import androidx.core.content.ContextCompat
 import android.Manifest
+import android.content.ComponentName
+import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import com.pedro.common.ConnectChecker
-import com.pedro.library.rtmp.RtmpCamera1
 import com.pedro.library.view.OpenGlView
 import android.content.Intent // Intent를 사용하기 위해 추가 필요
+import android.content.ServiceConnection
 import android.content.res.Configuration
 import android.graphics.Color
+import android.net.Uri
+import android.os.Build
+import android.os.IBinder
+import android.os.PowerManager
+import android.provider.Settings
 
 
-class PublishActivity : AppCompatActivity(), ConnectChecker {
+class PublishActivity : AppCompatActivity() {
 
-    private lateinit var rtmpCamera: RtmpCamera1
+    private var rtmpService: RtmpService? = null
+    private var isBound = false
+    private lateinit var openGlView: OpenGlView
     private lateinit var btnStartStop: Button
-    private lateinit var btnGoToPlay: Button // 새 버튼 변수 추가
-    // 테스트용 주소 (실제 서버 주소로 변경 필요)
+    private lateinit var btnGoToPlay: Button
     private val rtmpUrl = "rtmp://192.168.0.116/stream/u2"
+
+    // 서비스 연결 콜백
+    private val connection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
+            val binder = service as RtmpService.LocalBinder
+            rtmpService = binder.getService()
+            isBound = true
+            // 서비스에 있는 카메라 엔진에 현재 화면(View)을 연결
+            rtmpService?.initCamera(openGlView)
+
+            // 만약 이미 서비스에서 송출 중이라면 버튼 텍스트 변경
+            if (rtmpService?.getRtmpCamera()?.isStreaming == true) {
+                btnStartStop.text = getString(R.string.stop_stream)
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName?) {
+            isBound = false
+        }
+    }
+
+    private fun requestIgnoreBatteryOptimizations() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val intent = Intent()
+            val packageName = packageName
+            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                intent.action = Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS
+                intent.data = Uri.parse("package:$packageName")
+                startActivity(intent)
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_publish)
 
-        // 1. 카메라 권한 확인
         checkPermissions()
-
-        val openGlView = findViewById<OpenGlView>(R.id.surfaceView)
-
+        requestIgnoreBatteryOptimizations()
+        openGlView = findViewById(R.id.surfaceView)
         btnStartStop = findViewById(R.id.btnStartStop)
-        btnGoToPlay = findViewById(R.id.btnGoToPlay) // 버튼 연결
+        btnGoToPlay = findViewById(R.id.btnGoToPlay)
 
-        // 2. RtmpCamera1 초기화
-        rtmpCamera = RtmpCamera1(openGlView, this)
+        // 서비스 시작 및 바인딩
+        val intent = Intent(this, RtmpService::class.java)
+        startService(intent) // 앱이 꺼져도 서비스가 살 수 있게 startService 호출
+        bindService(intent, connection, BIND_AUTO_CREATE)
 
-        // 3. 시작/종료 버튼 리스너
         btnStartStop.setOnClickListener {
-            if (!rtmpCamera.isStreaming) {
-                // 다시 시작할 때
-                openGlView.setBackgroundColor(Color.TRANSPARENT)
+            val service = rtmpService ?: return@setOnClickListener
+            val camera = service.getRtmpCamera() ?: return@setOnClickListener
 
-                // 방법 B: 프레임과 회전값까지 지정 (폭, 높이, FPS, 비트레이트, 회전값)
-                // rotation은 보통 0(가로) 또는 90(세로)을 넣습니다.
-                if (rtmpCamera.prepareVideo(640, 480, 10, 1000 * 1024, 90) && rtmpCamera.prepareAudio()) {
-                    rtmpCamera.startStream(rtmpUrl)
+            if (!camera.isStreaming) {
+                if (service.startStream(rtmpUrl)) {
+                    openGlView.setBackgroundColor(Color.TRANSPARENT)
                     btnStartStop.text = getString(R.string.stop_stream)
-                } else {
-                    Toast.makeText(this, "Error preparing stream", Toast.LENGTH_SHORT).show()
                 }
             } else {
-                // 1. 스트리밍 중단
-                rtmpCamera.stopStream()
-                // stopStream 호출 후
+                service.stopStream()
                 openGlView.setBackgroundColor(Color.BLACK)
-
-                // 2. 카메라 미리보기 중단 (화면 멈춤 현상 해결의 핵심)
-                rtmpCamera.stopPreview()
-
-                // 3. 다시 깨끗한 상태로 미리보기 시작 (원할 경우)
-                // 만약 아예 검은 화면으로 두고 싶다면 stopPreview()만 호출하세요.
-                // 다시 카메라를 켜서 대기 상태로 만들고 싶다면 아래 줄을 추가하세요.
-                // rtmpCamera.startPreview()
-
                 btnStartStop.text = getString(R.string.start_stream)
             }
         }
 
-        // 2. 재생 화면으로 이동 버튼
         btnGoToPlay.setOnClickListener {
-            // 스트리밍 중이라면 안전하게 종료하고 이동하는 것이 좋습니다.
-            if (rtmpCamera.isStreaming) {
-                rtmpCamera.stopStream()
-                rtmpCamera.stopPreview()
-                btnStartStop.text = getString(R.string.start_stream)
-            }
+            val service = rtmpService ?: return@setOnClickListener
+//            // 스트리밍 중이라면 안전하게 종료하고 이동하는 것이 좋습니다.
+//            service.stopStream()
+//            openGlView.setBackgroundColor(Color.BLACK)
+//            btnStartStop.text = getString(R.string.start_stream)
 
             // PlayActivity로 이동하는 의도(Intent) 생성
-            val intent = Intent(this, PlayActivity::class.java)
-            startActivity(intent)
+//            val intent = Intent(this, PlayActivity::class.java)
+//            startActivity(intent)
+            service.switchCamera()
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isBound) {
+            // 화면이 꺼질 때 미리보기만 해제 (송출은 서비스에서 계속됨)
+            rtmpService?.getRtmpCamera()?.replaceView(this) // Context만 전달하여 View 연결 해제
+            unbindService(connection)
+            isBound = false
         }
     }
 
@@ -129,34 +162,4 @@ class PublishActivity : AppCompatActivity(), ConnectChecker {
             }
         }
     }
-
-    // --- ConnectChecker 콜백 구현 부분 ---
-
-    // 새로 추가해야 하는 메서드입니다.
-    override fun onConnectionStarted(url: String) {
-        runOnUiThread {
-            // 연결을 시도하기 시작했을 때 사용자에게 알림을 줄 수 있습니다.
-            Toast.makeText(this, "연결 시작: $url", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onConnectionSuccess() {
-        runOnUiThread { Toast.makeText(this, "연결 성공!", Toast.LENGTH_SHORT).show() }
-    }
-
-    override fun onConnectionFailed(reason: String) {
-        runOnUiThread {
-            Toast.makeText(this, "연결 실패: $reason", Toast.LENGTH_SHORT).show()
-            rtmpCamera.stopStream()
-            btnStartStop.text = getString(R.string.start_stream)
-        }
-    }
-
-    // 나머지 메서드들도 동일하게 유지합니다.
-    override fun onNewBitrate(bitrate: Long) {}
-    override fun onDisconnect() {
-        runOnUiThread { Toast.makeText(this, "연결 끊김", Toast.LENGTH_SHORT).show() }
-    }
-    override fun onAuthError() {}
-    override fun onAuthSuccess() {}
 }
