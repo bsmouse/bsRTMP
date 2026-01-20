@@ -29,7 +29,8 @@ class PublishActivity : AppCompatActivity() {
     private lateinit var openGlView: OpenGlView
     private lateinit var btnStartStop: Button
     private lateinit var btnGoToPlay: Button
-    private val rtmpUrl = "rtmp://192.168.0.116/stream/u2"
+    private lateinit var btnSwitch: Button
+    private val rtmpUrl = "rtmp://192.168.0.116/stream/u1"
 
     // 서비스 연결 콜백
     private val connection = object : ServiceConnection {
@@ -73,6 +74,7 @@ class PublishActivity : AppCompatActivity() {
         openGlView = findViewById(R.id.surfaceView)
         btnStartStop = findViewById(R.id.btnStartStop)
         btnGoToPlay = findViewById(R.id.btnGoToPlay)
+        btnSwitch = findViewById(R.id.btnSwitch)
 
         // 서비스 시작 및 바인딩
         val intent = Intent(this, RtmpService::class.java)
@@ -103,10 +105,15 @@ class PublishActivity : AppCompatActivity() {
 //            btnStartStop.text = getString(R.string.start_stream)
 
             // PlayActivity로 이동하는 의도(Intent) 생성
-//            val intent = Intent(this, PlayActivity::class.java)
-//            startActivity(intent)
+            val intent = Intent(this, PlayActivity::class.java)
+            startActivity(intent)
+        }
+
+        btnSwitch.setOnClickListener {
+            val service = rtmpService ?: return@setOnClickListener
             service.switchCamera()
         }
+
     }
 
     override fun onDestroy() {

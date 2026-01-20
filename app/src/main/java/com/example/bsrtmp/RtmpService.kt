@@ -79,7 +79,7 @@ class RtmpService : Service(), ConnectChecker {
                 480,
                 10,
                 1000 * 1024,
-                270
+                90
             ) == true && rtmpCamera?.prepareAudio() == true
         ) {
             rtmpCamera?.startStream(url)
