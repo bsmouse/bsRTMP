@@ -30,7 +30,7 @@ class PublishActivity : AppCompatActivity() {
     private lateinit var btnStartStop: Button
     private lateinit var btnGoToPlay: Button
     private lateinit var btnSwitch: Button
-    private val rtmpUrl = "rtmp://192.168.0.116/stream/u1"
+    private lateinit var btnSettings: Button
 
     // 서비스 연결 콜백
     private val connection = object : ServiceConnection {
@@ -75,20 +75,33 @@ class PublishActivity : AppCompatActivity() {
         btnStartStop = findViewById(R.id.btnStartStop)
         btnGoToPlay = findViewById(R.id.btnGoToPlay)
         btnSwitch = findViewById(R.id.btnSwitch)
+        btnSettings = findViewById<Button>(R.id.btnSettings)
 
         // 서비스 시작 및 바인딩
         val intent = Intent(this, RtmpService::class.java)
         startService(intent) // 앱이 꺼져도 서비스가 살 수 있게 startService 호출
         bindService(intent, connection, BIND_AUTO_CREATE)
 
+        btnSettings.setOnClickListener {
+            startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
         btnStartStop.setOnClickListener {
             val service = rtmpService ?: return@setOnClickListener
             val camera = service.getRtmpCamera() ?: return@setOnClickListener
 
             if (!camera.isStreaming) {
-                if (service.startStream(rtmpUrl)) {
-                    openGlView.setBackgroundColor(Color.TRANSPARENT)
-                    btnStartStop.text = getString(R.string.stop_stream)
+                // 버튼 클릭 리스너 내부 (또는 송출 시작 로직)
+                val pref = getSharedPreferences("DCCL_CONFIG", MODE_PRIVATE)
+                val savedUrl = pref.getString("publish_url", "")
+
+                if (!savedUrl.isNullOrEmpty()) {
+                    if (service.startStream(savedUrl)) {
+                        openGlView.setBackgroundColor(Color.TRANSPARENT)
+                        btnStartStop.text = getString(R.string.stop_stream)
+                    }
+                } else {
+                    Toast.makeText(this, "설정에서 송출 URL을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 service.stopStream()

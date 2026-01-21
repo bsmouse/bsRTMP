@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">bsRTMP</string>
+    <string name="app_name">DCCL</string>
     <string name="start_stream">Start Stream</string>
     <string name="stop_stream">Stop Stream</string>
 </resources>
