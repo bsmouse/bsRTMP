@@ -75,8 +75,8 @@ class RtmpService : Service(), ConnectChecker {
     fun startStream(url: String): Boolean {
         // PublishActivity에 있던 설정 로직을 서비스로 이동
         if (rtmpCamera?.prepareVideo(
-                640,
-                480,
+                1280,
+                720,
                 10,
                 1000 * 1024,
                 90

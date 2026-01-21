@@ -10,7 +10,7 @@ android:padding="20dp">
 <EditText android:id="@+id/etPublishUrl"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:hint="rtmp://dccl.iptime.org/stream/u1" />
+    android:text="rtmp://dccl.iptime.org/stream/u1" />
 
 <Space android:layout_width="match_parent" android:layout_height="20dp" />
 
@@ -18,7 +18,7 @@ android:padding="20dp">
 <EditText android:id="@+id/etPlayUrl"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:hint="rtmp://dccl.iptime.org/stream/d1" />
+    android:text="rtmp://dccl.iptime.org/stream/d1" />
 
 <Button android:id="@+id/btnSave"
     android:layout_width="match_parent"
