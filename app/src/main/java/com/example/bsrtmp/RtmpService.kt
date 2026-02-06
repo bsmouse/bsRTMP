@@ -80,15 +80,15 @@ class RtmpService : Service(), ConnectChecker {
             rtmpCamera?.replaceView(openGlView)
         }
 
-        // 초기화 시점에 미리보기가 꺼져있으면 안전하게 시작
-/*        if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
-            startPreviewSafe()
-        }*/
+        // 초기화 시점에 미리보기가 꺼져있으면 안전하게 시작하도록 유도할 수 있습니다.
+        if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
+             startPreviewSafe()
+        }
     }
 
     private fun startPreviewSafe() {
         try {
-            // prepare 호출 후 startPreview 실행
+            // 미리보기 시작 전에도 prepareVideo/Audio를 호출하면 스트림 시작 시 인코더가 준비된 상태가 됩니다.
             if (rtmpCamera?.prepareVideo(1280, 720, 10, 1000 * 1024, 90) == true &&
                 rtmpCamera?.prepareAudio() == true
             ) {
@@ -109,15 +109,12 @@ class RtmpService : Service(), ConnectChecker {
         val camera = rtmpCamera ?: return false
         if (camera.isStreaming) return true
 
-        // 이미 미리보기 중이라면 설정을 다시 하지 않고 바로 송출
-        if (camera.isOnPreview) {
-            camera.startStream(url)
-            return true
-        }
-
-        // 미리보기가 꺼져 있다면 준비 후 미리보기와 송출을 함께 시작
+        // 송출 전에는 반드시 prepareVideo와 prepareAudio를 호출하여 인코더를 준비해야 합니다.
+        // 이미 미리보기 중이더라도 인코더 설정이 필요하므로 항상 호출하는 것이 안전합니다.
         if (camera.prepareVideo(1280, 720, 10, 1000 * 1024, 90) && camera.prepareAudio()) {
-            camera.startPreview()
+            if (!camera.isOnPreview) {
+                camera.startPreview()
+            }
             camera.startStream(url)
             return true
         }
@@ -141,7 +138,6 @@ class RtmpService : Service(), ConnectChecker {
     fun setForegroundMode(openGlView: OpenGlView) {
         Log.d(tag, "setForegroundMode")
         rtmpCamera?.replaceView(openGlView)
-        // 화면으로 돌아왔을 때 스트리밍 중이 아니면 자동으로 미리보기를 켜지 않음
     }
 
     private fun createNotification(): Notification {

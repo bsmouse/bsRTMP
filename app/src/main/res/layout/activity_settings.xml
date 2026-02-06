@@ -1,28 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-android:layout_width="match_parent"
-android:layout_height="match_parent"
-android:orientation="vertical"
-android:padding="20dp">
-
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="송출용(Publish) URL" />
-<EditText android:id="@+id/etPublishUrl"
     android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="rtmp://dccl.iptime.org/stream/u1" />
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="20dp">
 
-<Space android:layout_width="match_parent" android:layout_height="20dp" />
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="송출용(Publish) URL" />
 
-<TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="재생용(Play) URL" />
-<EditText android:id="@+id/etPlayUrl"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="rtmp://dccl.iptime.org/stream/d1" />
+    <EditText
+        android:id="@+id/etPublishUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="rtmp://dccl.iptime.org/stream/u1" />
 
-<Button android:id="@+id/btnSave"
-    android:layout_width="match_parent"
-    android:layout_height="wrap_content"
-    android:text="Save"
-    android:layout_marginTop="30dp" />
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="20dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="재생용(Play) URL" />
+
+    <EditText
+        android:id="@+id/etPlayUrl"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="rtmp://dccl.iptime.org/stream/d1" />
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="20dp" />
+
+    <CheckBox
+        android:id="@+id/cbBackgroundStream"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="백그라운드 스트리밍 허용" />
+
+    <Button
+        android:id="@+id/btnSave"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="30dp"
+        android:text="Save" />
 </LinearLayout>

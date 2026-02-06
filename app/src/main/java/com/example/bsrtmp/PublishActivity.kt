@@ -150,8 +150,21 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onPause() {
         super.onPause()
         Log.d(TAG, "onPause")
+        
+        val pref = getSharedPreferences("DCCL_CONFIG", MODE_PRIVATE)
+        val allowBackground = pref.getBoolean("allow_background", true)
+
         if (!isFinishing) {
-            rtmpService?.setBackgroundMode()
+            if (allowBackground) {
+                rtmpService?.setBackgroundMode()
+            } else {
+                // 1. 백그라운드 전송이 비활성화된 경우 스트림과 미리보기 모두 중지
+                rtmpService?.stopStream()
+                rtmpService?.getRtmpCamera()?.stopPreview()
+                // UI 상태를 중지 상태로 변경
+                openGlView.setBackgroundColor(Color.BLACK)
+                updateUI()
+            }
         }
     }
 
@@ -161,7 +174,8 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         // Surface가 유효한 경우에만 setForegroundMode 호출하여 IllegalArgumentException 방지
         if (openGlView.holder.surface.isValid) {
             rtmpService?.let { service ->
-                service.setForegroundMode(openGlView)
+                /*service.setForegroundMode(openGlView)*/
+                service.initCamera(openGlView)
                 updateUI()
             }
         }
@@ -184,7 +198,8 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.d(TAG, "surfaceCreated")
         rtmpService?.let { service ->
-            service.setForegroundMode(openGlView)
+            /*service.setForegroundMode(openGlView)*/
+            service.initCamera(openGlView)
             updateUI()
         }
     }
