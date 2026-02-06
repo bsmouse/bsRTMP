@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Binder
@@ -18,9 +17,11 @@ import com.pedro.library.view.OpenGlView
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
-import com.pedro.encoder.input.video.CameraHelper
+import android.content.pm.ServiceInfo
+import android.util.Log
 
 class RtmpService : Service(), ConnectChecker {
+    private val tag = "RtmpService"
     private var rtmpCamera: RtmpCamera1? = null
     private val binder = LocalBinder()
     private var wakeLock: PowerManager.WakeLock? = null
@@ -34,35 +35,67 @@ class RtmpService : Service(), ConnectChecker {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d(tag, "onCreate")
 
-        // 1. CPU가 잠들지 않도록 WakeLock 설정
-        val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
-        wakeLock =
-            powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bsRTMP::StreamWakeLock")
-        wakeLock?.acquire()
+        val powerManager = getSystemService(POWER_SERVICE) as PowerManager
+        wakeLock = powerManager.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "bsRTMP::StreamWakeLock")
+        wakeLock?.acquire(10 * 60 * 1000L /*10 minutes*/)
 
-        // 2. Wi-Fi가 끊기지 않도록 WifiLock 설정
-        val wifiManager = getSystemService(Context.WIFI_SERVICE) as WifiManager
-        wifiLock =
-            wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "bsRTMP::WifiLock")
+        val wifiManager = getSystemService(WIFI_SERVICE) as WifiManager
+        @Suppress("DEPRECATION")
+        wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "bsRTMP::WifiLock")
         wifiLock?.acquire()
 
-        startForeground(1, createNotification())
+        val notification = createNotification()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            startForeground(
+                1,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        } else {
+            startForeground(
+                1,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+            )
+        }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // 서비스 종료 시 잠금 해제
+        Log.d(tag, "onDestroy")
         if (wakeLock?.isHeld == true) wakeLock?.release()
         if (wifiLock?.isHeld == true) wifiLock?.release()
+        stopStream()
+        rtmpCamera?.stopPreview()
     }
 
-    // 카메라 객체 초기화 (액티비티에서 호출)
     fun initCamera(openGlView: OpenGlView) {
         if (rtmpCamera == null) {
             rtmpCamera = RtmpCamera1(openGlView, this)
+            // 전면 카메라를 기본으로 설정
+            rtmpCamera?.switchCamera()
         } else {
             rtmpCamera?.replaceView(openGlView)
+        }
+
+        // 초기화 시점에 미리보기가 꺼져있으면 안전하게 시작
+/*        if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
+            startPreviewSafe()
+        }*/
+    }
+
+    private fun startPreviewSafe() {
+        try {
+            // prepare 호출 후 startPreview 실행
+            if (rtmpCamera?.prepareVideo(1280, 720, 10, 1000 * 1024, 90) == true &&
+                rtmpCamera?.prepareAudio() == true
+            ) {
+                rtmpCamera?.startPreview()
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "미리보기 시작 중 예외 발생: ${e.message}")
         }
     }
 
@@ -73,56 +106,66 @@ class RtmpService : Service(), ConnectChecker {
     }
 
     fun startStream(url: String): Boolean {
-        // PublishActivity에 있던 설정 로직을 서비스로 이동
-        if (rtmpCamera?.prepareVideo(
-                1280,
-                720,
-                10,
-                1000 * 1024,
-                90
-            ) == true && rtmpCamera?.prepareAudio() == true
-        ) {
-            rtmpCamera?.startStream(url)
+        val camera = rtmpCamera ?: return false
+        if (camera.isStreaming) return true
+
+        // 이미 미리보기 중이라면 설정을 다시 하지 않고 바로 송출
+        if (camera.isOnPreview) {
+            camera.startStream(url)
             return true
         }
+
+        // 미리보기가 꺼져 있다면 준비 후 미리보기와 송출을 함께 시작
+        if (camera.prepareVideo(1280, 720, 10, 1000 * 1024, 90) && camera.prepareAudio()) {
+            camera.startPreview()
+            camera.startStream(url)
+            return true
+        }
+
         return false
     }
 
     fun stopStream() {
         rtmpCamera?.stopStream()
-        rtmpCamera?.stopPreview()
+    }
+
+    fun setBackgroundMode() {
+        Log.d(tag, "setBackgroundMode")
+        if (rtmpCamera?.isStreaming == true) {
+            rtmpCamera?.replaceView(this)
+        } else {
+            rtmpCamera?.stopPreview()
+        }
+    }
+
+    fun setForegroundMode(openGlView: OpenGlView) {
+        Log.d(tag, "setForegroundMode")
+        rtmpCamera?.replaceView(openGlView)
+        // 화면으로 돌아왔을 때 스트리밍 중이 아니면 자동으로 미리보기를 켜지 않음
     }
 
     private fun createNotification(): Notification {
         val channelId = "rtmp_channel"
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "RTMP Stream Service",
-                NotificationManager.IMPORTANCE_LOW
-            )
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(
-                channel
-            )
+            val channel = NotificationChannel(channelId, "RTMP Stream Service", NotificationManager.IMPORTANCE_LOW)
+            (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
         return NotificationCompat.Builder(this, channelId)
             .setContentTitle("실시간 방송 중")
             .setContentText("앱이 백그라운드에서도 송출을 유지합니다.")
             .setSmallIcon(R.mipmap.ic_launcher)
+            .setOngoing(true)
             .build()
     }
 
-    // ConnectChecker 구현 (필요 시 액티비티로 콜백 전달 가능)
     private fun showToast(message: String) {
-        // Looper.getMainLooper()를 사용하여 UI 스레드에서 Toast를 띄움
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(applicationContext, message, Toast.LENGTH_SHORT).show()
         }
     }
 
-    // ConnectChecker 구현부에서 사용 예시
     override fun onConnectionStarted(url: String) {
-        showToast("연결 시작: $url")
+        Log.d(tag, "연결 시작: $url")
     }
 
     override fun onConnectionSuccess() {
@@ -130,11 +173,15 @@ class RtmpService : Service(), ConnectChecker {
     }
 
     override fun onConnectionFailed(reason: String) {
+        Log.e(tag, "연결 실패: $reason")
         showToast("연결 실패: $reason")
     }
 
     override fun onNewBitrate(bitrate: Long) {}
-    override fun onDisconnect() {}
+    override fun onDisconnect() {
+        Log.d(tag, "연결 종료")
+    }
+
     override fun onAuthError() {}
     override fun onAuthSuccess() {}
 }

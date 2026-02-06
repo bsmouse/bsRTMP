@@ -91,6 +91,7 @@ class PlayActivity : AppCompatActivity() {
     }
 
 
+
     // 재생 중 화면을 나가면 플레이어를 확실히 정지/해제해야 합니다.
     private fun releasePlayer() {
         player?.let {
