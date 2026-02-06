@@ -96,9 +96,11 @@ class RtmpService : Service(), ConnectChecker {
             rtmpCamera?.replaceView(openGlView)
         }
 
+/*
         if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
             startPreviewSafe()
         }
+*/
     }
 
     private fun startPreviewSafe() {
