@@ -42,7 +42,6 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             rtmpService = binder.getService()
             isBound = true
             
-            // 서비스 연결 시점에 Surface가 이미 유효하다면 카메라 초기화
             if (openGlView.holder.surface.isValid) {
                 rtmpService?.initCamera(openGlView)
                 updateUI()
@@ -52,6 +51,7 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         override fun onServiceDisconnected(name: ComponentName?) {
             Log.d(TAG, "onServiceDisconnected")
             isBound = false
+            rtmpService = null
         }
     }
 
@@ -83,33 +83,30 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_publish)
 
-        Log.d(TAG, "onCreate: 새 액티비티 인스턴스가 생성되었습니다.")
-        Toast.makeText(this, "새 액티비티 생성됨 (onCreate)", Toast.LENGTH_SHORT).show()
+        Log.d(TAG, "onCreate")
 
         checkPermissions()
         requestIgnoreBatteryOptimizations()
         openGlView = findViewById(R.id.surfaceView)
-        openGlView.holder.addCallback(this) // Callback 추가
+        openGlView.holder.addCallback(this)
         
         btnStartStop = findViewById(R.id.btnStartStop)
         btnGoToPlay = findViewById(R.id.btnGoToPlay)
         btnSwitch = findViewById(R.id.btnSwitch)
         btnSettings = findViewById(R.id.btnSettings)
 
-        val intent = Intent(this, RtmpService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent)
-        } else {
-            startService(intent)
-        }
-        bindService(intent, connection, BIND_AUTO_CREATE)
+        startAndBindRtmpService()
 
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         btnStartStop.setOnClickListener {
-            val service = rtmpService ?: return@setOnClickListener
+            val service = rtmpService ?: run {
+                startAndBindRtmpService()
+                Toast.makeText(this, "서비스를 다시 시작합니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
             val camera = service.getRtmpCamera() ?: return@setOnClickListener
 
             if (!camera.isStreaming) {
@@ -140,11 +137,14 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        Log.d(TAG, "onNewIntent: 기존 액티비티가 재사용되었습니다.")
-        Toast.makeText(this, "기존 액티비티 재사용됨 (onNewIntent)", Toast.LENGTH_SHORT).show()
+    private fun startAndBindRtmpService() {
+        val intent = Intent(this, RtmpService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(intent)
+        } else {
+            startService(intent)
+        }
+        bindService(intent, connection, BIND_AUTO_CREATE)
     }
 
     override fun onPause() {
@@ -158,10 +158,8 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             if (allowBackground) {
                 rtmpService?.setBackgroundMode()
             } else {
-                // 1. 백그라운드 전송이 비활성화된 경우 스트림과 미리보기 모두 중지
                 rtmpService?.stopStream()
                 rtmpService?.getRtmpCamera()?.stopPreview()
-                // UI 상태를 중지 상태로 변경
                 openGlView.setBackgroundColor(Color.BLACK)
                 updateUI()
             }
@@ -171,13 +169,13 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun onResume() {
         super.onResume()
         Log.d(TAG, "onResume")
-        // Surface가 유효한 경우에만 setForegroundMode 호출하여 IllegalArgumentException 방지
-        if (openGlView.holder.surface.isValid) {
-            rtmpService?.let { service ->
-                /*service.setForegroundMode(openGlView)*/
-                service.initCamera(openGlView)
-                updateUI()
-            }
+        
+        // 서비스가 없거나 바인딩이 끊겼다면 다시 시작 및 바인딩
+        if (rtmpService == null || !isBound) {
+            startAndBindRtmpService()
+        } else if (openGlView.holder.surface.isValid) {
+            rtmpService?.initCamera(openGlView)
+            updateUI()
         }
     }
 
@@ -190,23 +188,15 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         }
     }
 
-    override fun onConfigurationChanged(newConfig: Configuration) {
-        super.onConfigurationChanged(newConfig)
-    }
-
-    // SurfaceHolder.Callback 구현
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.d(TAG, "surfaceCreated")
         rtmpService?.let { service ->
-            /*service.setForegroundMode(openGlView)*/
             service.initCamera(openGlView)
             updateUI()
         }
     }
 
-    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-        Log.d(TAG, "surfaceChanged: $width x $height")
-    }
+    override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {}
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         Log.d(TAG, "surfaceDestroyed")

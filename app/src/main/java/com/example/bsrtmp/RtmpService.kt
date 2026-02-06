@@ -27,6 +27,10 @@ class RtmpService : Service(), ConnectChecker {
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
+    // Tracking if we are trying to stream or actually streaming
+    private var wantToStream = false
+    private var isBackgroundMode = false
+
     inner class LocalBinder : Binder() {
         fun getService(): RtmpService = this@RtmpService
     }
@@ -46,6 +50,11 @@ class RtmpService : Service(), ConnectChecker {
         wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "bsRTMP::WifiLock")
         wifiLock?.acquire()
 
+        // Start as foreground service immediately
+        startForegroundWithNotification()
+    }
+
+    private fun startForegroundWithNotification() {
         val notification = createNotification()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             startForeground(
@@ -53,13 +62,21 @@ class RtmpService : Service(), ConnectChecker {
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             )
-        } else {
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(
                 1,
                 notification,
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA or ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
             )
+        } else {
+            startForeground(1, notification)
         }
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.d(tag, "onStartCommand")
+        startForegroundWithNotification()
+        return START_STICKY
     }
 
     override fun onDestroy() {
@@ -74,28 +91,25 @@ class RtmpService : Service(), ConnectChecker {
     fun initCamera(openGlView: OpenGlView) {
         if (rtmpCamera == null) {
             rtmpCamera = RtmpCamera1(openGlView, this)
-            // 전면 카메라를 기본으로 설정
             rtmpCamera?.switchCamera()
         } else {
             rtmpCamera?.replaceView(openGlView)
         }
 
-        // 초기화 시점에 미리보기가 꺼져있으면 안전하게 시작하도록 유도할 수 있습니다.
         if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
-             startPreviewSafe()
+            startPreviewSafe()
         }
     }
 
     private fun startPreviewSafe() {
         try {
-            // 미리보기 시작 전에도 prepareVideo/Audio를 호출하면 스트림 시작 시 인코더가 준비된 상태가 됩니다.
             if (rtmpCamera?.prepareVideo(1280, 720, 10, 1000 * 1024, 90) == true &&
                 rtmpCamera?.prepareAudio() == true
             ) {
                 rtmpCamera?.startPreview()
             }
         } catch (e: Exception) {
-            Log.e(tag, "미리보기 시작 중 예외 발생: ${e.message}")
+            Log.e(tag, "Error starting preview: ${e.message}")
         }
     }
 
@@ -109,8 +123,10 @@ class RtmpService : Service(), ConnectChecker {
         val camera = rtmpCamera ?: return false
         if (camera.isStreaming) return true
 
-        // 송출 전에는 반드시 prepareVideo와 prepareAudio를 호출하여 인코더를 준비해야 합니다.
-        // 이미 미리보기 중이더라도 인코더 설정이 필요하므로 항상 호출하는 것이 안전합니다.
+        // Ensure we are in foreground before starting stream
+        startForegroundWithNotification()
+
+        wantToStream = true
         if (camera.prepareVideo(1280, 720, 10, 1000 * 1024, 90) && camera.prepareAudio()) {
             if (!camera.isOnPreview) {
                 camera.startPreview()
@@ -119,24 +135,38 @@ class RtmpService : Service(), ConnectChecker {
             return true
         }
 
+        wantToStream = false
         return false
     }
 
     fun stopStream() {
+        wantToStream = false
         rtmpCamera?.stopStream()
     }
 
     fun setBackgroundMode() {
         Log.d(tag, "setBackgroundMode")
-        if (rtmpCamera?.isStreaming == true) {
+        isBackgroundMode = true
+        if (rtmpCamera?.isStreaming == true || wantToStream) {
             rtmpCamera?.replaceView(this)
         } else {
+            Log.d(tag, "Not streaming, stopping service.")
             rtmpCamera?.stopPreview()
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
         }
     }
 
     fun setForegroundMode(openGlView: OpenGlView) {
         Log.d(tag, "setForegroundMode")
+        isBackgroundMode = false
+        startForegroundWithNotification()
         rtmpCamera?.replaceView(openGlView)
     }
 
@@ -147,8 +177,8 @@ class RtmpService : Service(), ConnectChecker {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("실시간 방송 중")
-            .setContentText("앱이 백그라운드에서도 송출을 유지합니다.")
+            .setContentTitle("Streaming Live")
+            .setContentText("App is maintaining stream in background.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
@@ -161,21 +191,42 @@ class RtmpService : Service(), ConnectChecker {
     }
 
     override fun onConnectionStarted(url: String) {
-        Log.d(tag, "연결 시작: $url")
+        Log.d(tag, "Connection started: $url")
+        showToast("Connection started: $url")
     }
 
     override fun onConnectionSuccess() {
-        showToast("연결 성공!")
+        Log.d(tag, "Connection success!")
     }
 
     override fun onConnectionFailed(reason: String) {
-        Log.e(tag, "연결 실패: $reason")
-        showToast("연결 실패: $reason")
+        Log.e(tag, "Connection failed: $reason")
+        showToast("Connection failed: $reason")
+        wantToStream = false
+        if (isBackgroundMode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
+        }
     }
 
     override fun onNewBitrate(bitrate: Long) {}
     override fun onDisconnect() {
-        Log.d(tag, "연결 종료")
+        Log.d(tag, "Disconnected")
+        wantToStream = false
+        if (isBackgroundMode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(true)
+            }
+            stopSelf()
+        }
     }
 
     override fun onAuthError() {}
