@@ -96,11 +96,9 @@ class RtmpService : Service(), ConnectChecker {
             rtmpCamera?.replaceView(openGlView)
         }
 
-/*
         if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
             startPreviewSafe()
         }
-*/
     }
 
     private fun startPreviewSafe() {
@@ -194,7 +192,7 @@ class RtmpService : Service(), ConnectChecker {
 
     override fun onConnectionStarted(url: String) {
         Log.d(tag, "Connection started: $url")
-        showToast("Connection started: $url")
+        showToast("연결 시작: $url")
     }
 
     override fun onConnectionSuccess() {
@@ -219,6 +217,7 @@ class RtmpService : Service(), ConnectChecker {
     override fun onNewBitrate(bitrate: Long) {}
     override fun onDisconnect() {
         Log.d(tag, "Disconnected")
+        showToast("연결 종료")
         wantToStream = false
         if (isBackgroundMode) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {

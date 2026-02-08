@@ -60,10 +60,11 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         Log.d(TAG, "updateUI - isStreaming: $isStreaming")
         if (isStreaming) {
             btnStartStop.text = getString(R.string.stop_stream)
-            openGlView.setBackgroundColor(Color.TRANSPARENT)
         } else {
             btnStartStop.text = getString(R.string.start_stream)
         }
+        // 프리뷰를 보기 위해 항상 투명하게 유지
+        openGlView.setBackgroundColor(Color.TRANSPARENT)
     }
 
     private fun requestIgnoreBatteryOptimizations() {
@@ -115,16 +116,14 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
                 if (!savedUrl.isNullOrEmpty()) {
                     if (service.startStream(savedUrl)) {
-                        openGlView.setBackgroundColor(Color.TRANSPARENT)
-                        btnStartStop.text = getString(R.string.stop_stream)
+                        updateUI()
                     }
                 } else {
                     Toast.makeText(this, "설정에서 송출 URL을 입력해주세요.", Toast.LENGTH_SHORT).show()
                 }
             } else {
                 service.stopStream()
-                openGlView.setBackgroundColor(Color.BLACK)
-                btnStartStop.text = getString(R.string.start_stream)
+                updateUI()
             }
         }
 
@@ -160,7 +159,6 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             } else {
                 rtmpService?.stopStream()
                 rtmpService?.getRtmpCamera()?.stopPreview()
-                openGlView.setBackgroundColor(Color.BLACK)
                 updateUI()
             }
         }
@@ -170,7 +168,6 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onResume()
         Log.d(TAG, "onResume")
         
-        // 서비스가 없거나 바인딩이 끊겼다면 다시 시작 및 바인딩
         if (rtmpService == null || !isBound) {
             startAndBindRtmpService()
         } else if (openGlView.holder.surface.isValid) {

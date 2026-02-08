@@ -42,7 +42,7 @@ android:layout_height="match_parent">
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="Start Stream" />
+            android:text="Stream On" />
 
         <Button
             android:id="@+id/btnGoToPlay"
@@ -50,14 +50,14 @@ android:layout_height="match_parent">
             android:layout_height="wrap_content"
             android:layout_marginEnd="8dp"
             android:layout_weight="1"
-            android:text="Go To\nPlay" />
+            android:text="Play" />
 
         <Button
             android:id="@+id/btnSettings"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="Settings\n" />
+            android:text="Settings" />
     </LinearLayout>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
