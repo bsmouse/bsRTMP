@@ -27,9 +27,18 @@ class RtmpService : Service(), ConnectChecker {
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
-    // Tracking if we are trying to stream or actually streaming
     private var wantToStream = false
     private var isBackgroundMode = false
+
+    // Activity에 상태를 전달하기 위한 인터페이스
+    interface StreamListener {
+        fun onStatusChanged(status: String)
+    }
+    private var listener: StreamListener? = null
+
+    fun setStreamListener(listener: StreamListener?) {
+        this.listener = listener
+    }
 
     inner class LocalBinder : Binder() {
         fun getService(): RtmpService = this@RtmpService
@@ -50,7 +59,6 @@ class RtmpService : Service(), ConnectChecker {
         wifiLock = wifiManager.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "bsRTMP::WifiLock")
         wifiLock?.acquire()
 
-        // Start as foreground service immediately
         startForegroundWithNotification()
     }
 
@@ -97,7 +105,7 @@ class RtmpService : Service(), ConnectChecker {
         }
 
         if (rtmpCamera?.isOnPreview == false && rtmpCamera?.isStreaming == false) {
-            startPreviewSafe()
+             startPreviewSafe()
         }
     }
 
@@ -109,7 +117,7 @@ class RtmpService : Service(), ConnectChecker {
                 rtmpCamera?.startPreview()
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error starting preview: ${e.message}")
+            Log.e(tag, "미리보기 시작 중 예외 발생: ${e.message}")
         }
     }
 
@@ -123,9 +131,8 @@ class RtmpService : Service(), ConnectChecker {
         val camera = rtmpCamera ?: return false
         if (camera.isStreaming) return true
 
-        // Ensure we are in foreground before starting stream
         startForegroundWithNotification()
-
+        
         wantToStream = true
         if (camera.prepareVideo(1280, 720, 10, 1000 * 1024, 90) && camera.prepareAudio()) {
             if (!camera.isOnPreview) {
@@ -134,7 +141,7 @@ class RtmpService : Service(), ConnectChecker {
             camera.startStream(url)
             return true
         }
-
+        
         wantToStream = false
         return false
     }
@@ -142,6 +149,7 @@ class RtmpService : Service(), ConnectChecker {
     fun stopStream() {
         wantToStream = false
         rtmpCamera?.stopStream()
+        listener?.onStatusChanged("Status: Stopped")
     }
 
     fun setBackgroundMode() {
@@ -150,9 +158,9 @@ class RtmpService : Service(), ConnectChecker {
         if (rtmpCamera?.isStreaming == true || wantToStream) {
             rtmpCamera?.replaceView(this)
         } else {
-            Log.d(tag, "Not streaming, stopping service.")
+            Log.d(tag, "송출 중이 아니므로 서비스를 종료합니다.")
             rtmpCamera?.stopPreview()
-
+            
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
                 stopForeground(STOP_FOREGROUND_REMOVE)
             } else {
@@ -177,8 +185,8 @@ class RtmpService : Service(), ConnectChecker {
             (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
         }
         return NotificationCompat.Builder(this, channelId)
-            .setContentTitle("Streaming Live")
-            .setContentText("App is maintaining stream in background.")
+            .setContentTitle("실시간 방송 중")
+            .setContentText("앱이 백그라운드에서도 송출을 유지합니다.")
             .setSmallIcon(R.mipmap.ic_launcher)
             .setOngoing(true)
             .build()
@@ -191,17 +199,18 @@ class RtmpService : Service(), ConnectChecker {
     }
 
     override fun onConnectionStarted(url: String) {
-        Log.d(tag, "Connection started: $url")
-        showToast("연결 시작: $url")
+        Log.d(tag, "연결 시작: $url")
+        listener?.onStatusChanged("Status: Connecting to $url...")
     }
 
     override fun onConnectionSuccess() {
-        Log.d(tag, "Connection success!")
+        Log.d(tag, "연결 성공!")
+        listener?.onStatusChanged("Status: Connected")
     }
 
     override fun onConnectionFailed(reason: String) {
-        Log.e(tag, "Connection failed: $reason")
-        showToast("Connection failed: $reason")
+        Log.e(tag, "연결 실패: $reason")
+        listener?.onStatusChanged("Error: $reason")
         wantToStream = false
         if (isBackgroundMode) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -214,10 +223,14 @@ class RtmpService : Service(), ConnectChecker {
         }
     }
 
-    override fun onNewBitrate(bitrate: Long) {}
+    override fun onNewBitrate(bitrate: Long) {
+        // 비트레이트 정보를 kbps 단위로 전달
+        listener?.onStatusChanged("Status: Connected | Bitrate: ${bitrate / 1000} kbps")
+    }
+
     override fun onDisconnect() {
-        Log.d(tag, "Disconnected")
-        showToast("연결 종료")
+        Log.d(tag, "연결 종료")
+        listener?.onStatusChanged("Status: Disconnected")
         wantToStream = false
         if (isBackgroundMode) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
@@ -230,6 +243,10 @@ class RtmpService : Service(), ConnectChecker {
         }
     }
 
-    override fun onAuthError() {}
-    override fun onAuthSuccess() {}
+    override fun onAuthError() {
+        listener?.onStatusChanged("Error: Auth Error")
+    }
+    override fun onAuthSuccess() {
+        listener?.onStatusChanged("Status: Auth Success")
+    }
 }

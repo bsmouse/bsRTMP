@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -34,6 +35,7 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var btnGoToPlay: Button
     private lateinit var btnSwitch: Button
     private lateinit var btnSettings: Button
+    private lateinit var tvStatus: TextView
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
@@ -42,6 +44,15 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             rtmpService = binder.getService()
             isBound = true
             
+            // 서비스에 리스너 등록
+            rtmpService?.setStreamListener(object : RtmpService.StreamListener {
+                override fun onStatusChanged(status: String) {
+                    runOnUiThread {
+                        tvStatus.text = status
+                    }
+                }
+            })
+
             if (openGlView.holder.surface.isValid) {
                 rtmpService?.initCamera(openGlView)
                 updateUI()
@@ -62,8 +73,8 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             btnStartStop.text = getString(R.string.stop_stream)
         } else {
             btnStartStop.text = getString(R.string.start_stream)
+            tvStatus.text = "Status: Stopped"
         }
-        // 프리뷰를 보기 위해 항상 투명하게 유지
         openGlView.setBackgroundColor(Color.TRANSPARENT)
     }
 
@@ -88,9 +99,11 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
 
         checkPermissions()
         requestIgnoreBatteryOptimizations()
+        
         openGlView = findViewById(R.id.surfaceView)
         openGlView.holder.addCallback(this)
         
+        tvStatus = findViewById(R.id.tvStatus)
         btnStartStop = findViewById(R.id.btnStartStop)
         btnGoToPlay = findViewById(R.id.btnGoToPlay)
         btnSwitch = findViewById(R.id.btnSwitch)
@@ -180,6 +193,7 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         super.onDestroy()
         Log.d(TAG, "onDestroy")
         if (isBound) {
+            rtmpService?.setStreamListener(null)
             unbindService(connection)
             isBound = false
         }
