@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.widget.Button
+import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +15,7 @@ import androidx.core.app.ActivityCompat
 import com.pedro.library.view.OpenGlView
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
@@ -33,8 +35,8 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     private lateinit var openGlView: OpenGlView
     private lateinit var btnStartStop: Button
     private lateinit var btnGoToPlay: Button
-    private lateinit var btnSwitch: Button
-    private lateinit var btnSettings: Button
+    private lateinit var btnSwitch: ImageButton
+    private lateinit var btnSettings: ImageButton
     private lateinit var tvStatus: TextView
 
     private val connection = object : ServiceConnection {
@@ -44,7 +46,6 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             rtmpService = binder.getService()
             isBound = true
             
-            // 서비스에 리스너 등록
             rtmpService?.setStreamListener(object : RtmpService.StreamListener {
                 override fun onStatusChanged(status: String) {
                     runOnUiThread {
@@ -71,8 +72,10 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         Log.d(TAG, "updateUI - isStreaming: $isStreaming")
         if (isStreaming) {
             btnStartStop.text = getString(R.string.stop_stream)
+            btnStartStop.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#F44336")) // Red
         } else {
             btnStartStop.text = getString(R.string.start_stream)
+            btnStartStop.backgroundTintList = ColorStateList.valueOf(Color.parseColor("#4CAF50")) // Green
             tvStatus.text = "Status: Stopped"
         }
         openGlView.setBackgroundColor(Color.TRANSPARENT)

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:padding="20dp"
+    android:gravity="center">
 
     <TextView
         android:layout_width="wrap_content"
@@ -15,7 +15,10 @@
         android:id="@+id/etPublishUrl"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="rtmp://dccl.iptime.org/stream/u1" />
+        android:hint="rtmp://dccl.iptime.org/stream/s22"
+        android:inputType="textUri"
+        android:maxLines="1"
+        android:textAlignment="viewStart" />
 
     <Space
         android:layout_width="match_parent"
@@ -30,7 +33,10 @@
         android:id="@+id/etPlayUrl"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="rtmp://dccl.iptime.org/stream/d1" />
+        android:hint="rtmp://dccl.iptime.org/stream/play"
+        android:inputType="textUri"
+        android:maxLines="1"
+        android:textAlignment="viewStart" />
 
     <Space
         android:layout_width="match_parent"
