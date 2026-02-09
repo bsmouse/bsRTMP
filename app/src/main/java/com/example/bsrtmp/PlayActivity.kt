@@ -57,6 +57,7 @@ class PlayActivity : AppCompatActivity() {
 
     private var lastFrameCount = 0
 
+    @UnstableApi
     private fun updatePlayStats() {
         val p = player ?: return
         if (p.playbackState == Player.STATE_READY) {
