@@ -16,15 +16,20 @@
         android:id="@+id/tvPlayStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_margin="16dp"
-        android:background="#80000000"
-        android:padding="8dp"
+        android:layout_marginTop="26dp"
+        android:layout_marginStart="10dp"
+        android:background="@android:color/transparent"
+        android:padding="2dp"
         android:textColor="@android:color/white"
-        android:textSize="12sp"
+        android:shadowColor="@android:color/black"
+        android:shadowDx="2"
+        android:shadowDy="2"
+        android:shadowRadius="3"
         android:textStyle="bold"
+        android:textSize="16sp"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
-        tools:text="PLAY | 1280x720 | 30 FPS | 1500 kbps" />
+        tools:text="Play: 1280x720 | 30 FPS | 1500 kbps" />
 
     <ImageButton
         android:id="@+id/btnRotate"

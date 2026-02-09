@@ -98,7 +98,7 @@ class RtmpService : Service(), ConnectChecker {
             if (camera != null && camera.isStreaming) {
                 val bitRateKbps = lastBitrate / 1000
                 
-                val statusMsg = "LIVE | $currentWidth x $currentHeight | $currentFps FPS | $bitRateKbps kbps"
+                val statusMsg = "Live: $currentWidth x $currentHeight | $currentFps FPS | $bitRateKbps kbps"
                 listener?.onStatusChanged(statusMsg)
                 
                 statsHandler.postDelayed(this, 1000)

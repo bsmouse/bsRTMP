@@ -57,7 +57,7 @@ class PlayActivity : AppCompatActivity() {
 
     private var lastFrameCount = 0
 
-    @UnstableApi
+    @OptIn(UnstableApi::class)
     private fun updatePlayStats() {
         val p = player ?: return
         if (p.playbackState == Player.STATE_READY) {
@@ -73,7 +73,7 @@ class PlayActivity : AppCompatActivity() {
                 val bitrate = format.bitrate
                 val bitrateStr = if (bitrate > 0) "${bitrate / 1000} kbps" else "--- kbps"
 
-                val status = "PLAY | ${format.width}x${format.height} | $fps FPS | $bitrateStr"
+                val status = "Play: ${format.width}x${format.height} | $fps FPS | $bitrateStr"
                 tvPlayStatus.text = status
             }
         }
@@ -109,13 +109,25 @@ class PlayActivity : AppCompatActivity() {
 
                     addListener(object : Player.Listener {
                         override fun onPlayerError(error: PlaybackException) {
-                            tvPlayStatus.text = "Error: ${error.message}"
+                            tvPlayStatus.text = "Connection Failed: ${error.errorCodeName}"
+                            Log.e(TAG, "Playback error: ${error.message}", error)
                         }
+
                         override fun onPlaybackStateChanged(state: Int) {
-                            if (state == Player.STATE_READY) {
-                                statsHandler.post(updateStatsRunnable)
-                            } else if (state == Player.STATE_ENDED || state == Player.STATE_IDLE) {
-                                statsHandler.removeCallbacks(updateStatsRunnable)
+                            when (state) {
+                                Player.STATE_BUFFERING -> {
+                                    tvPlayStatus.text = "Connecting..."
+                                }
+                                Player.STATE_READY -> {
+                                    statsHandler.post(updateStatsRunnable)
+                                }
+                                Player.STATE_ENDED -> {
+                                    tvPlayStatus.text = "Playback Ended"
+                                    statsHandler.removeCallbacks(updateStatsRunnable)
+                                }
+                                Player.STATE_IDLE -> {
+                                    statsHandler.removeCallbacks(updateStatsRunnable)
+                                }
                             }
                         }
                     })
