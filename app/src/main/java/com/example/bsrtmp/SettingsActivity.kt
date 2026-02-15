@@ -16,18 +16,21 @@ class SettingsActivity : AppCompatActivity() {
         val etPublish = findViewById<EditText>(R.id.etPublishUrl)
         val etPlay = findViewById<EditText>(R.id.etPlayUrl)
         val cbBackground = findViewById<CheckBox>(R.id.cbBackgroundStream)
+        val cbAudio = findViewById<CheckBox>(R.id.cbAudioEnabled)
         val btnSave = findViewById<Button>(R.id.btnSave)
 
         // 저장된 값 불러오기
         etPublish.setText(pref.getString("publish_url", ""))
         etPlay.setText(pref.getString("play_url", ""))
         cbBackground.isChecked = pref.getBoolean("allow_background", true)
+        cbAudio.isChecked = pref.getBoolean("enable_audio", true)
 
         btnSave.setOnClickListener {
             pref.edit().apply {
                 putString("publish_url", etPublish.text.toString())
                 putString("play_url", etPlay.text.toString())
                 putBoolean("allow_background", cbBackground.isChecked)
+                putBoolean("enable_audio", cbAudio.isChecked)
                 apply()
             }
             Toast.makeText(this, "저장되었습니다.", Toast.LENGTH_SHORT).show()

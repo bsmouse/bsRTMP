@@ -16,7 +16,6 @@ import com.pedro.library.view.OpenGlView
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.res.ColorStateList
-import android.content.res.Configuration
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
@@ -43,10 +42,11 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             Log.d(TAG, "onServiceConnected")
             val binder = service as RtmpService.LocalBinder
-            rtmpService = binder.getService()
+            val s = binder.getService()
+            rtmpService = s
             isBound = true
             
-            rtmpService?.setStreamListener(object : RtmpService.StreamListener {
+            s.setStreamListener(object : RtmpService.StreamListener {
                 override fun onStatusChanged(status: String) {
                     runOnUiThread {
                         tvStatus.text = status
@@ -54,8 +54,11 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 }
             })
 
+            // 서비스 연결 시점에 설정값 동기화
+            syncAudioConfig()
+
             if (openGlView.holder.surface.isValid) {
-                rtmpService?.initCamera(openGlView)
+                s.initCamera(openGlView)
                 updateUI()
             }
         }
@@ -65,6 +68,12 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
             isBound = false
             rtmpService = null
         }
+    }
+
+    private fun syncAudioConfig() {
+        val pref = getSharedPreferences("DCCL_CONFIG", MODE_PRIVATE)
+        val allowAudio = pref.getBoolean("enable_audio", true)
+        rtmpService?.setAudioEnabled(allowAudio)
     }
 
     private fun updateUI() {
@@ -124,12 +133,16 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
                 Toast.makeText(this, "서비스를 다시 시작합니다. 잠시 후 다시 시도해주세요.", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            
+            // 스트리밍 시작 전 최신 설정값 확인
+            syncAudioConfig()
+            
             val camera = service.getRtmpCamera() ?: return@setOnClickListener
 
             if (!camera.isStreaming) {
                 val pref = getSharedPreferences("DCCL_CONFIG", MODE_PRIVATE)
                 val savedUrl = pref.getString("publish_url", "")
-
+  
                 if (!savedUrl.isNullOrEmpty()) {
                     if (service.startStream(savedUrl)) {
                         updateUI()
@@ -186,9 +199,13 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
         
         if (rtmpService == null || !isBound) {
             startAndBindRtmpService()
-        } else if (openGlView.holder.surface.isValid) {
-            rtmpService?.initCamera(openGlView)
-            updateUI()
+        } else {
+            // 화면 복귀 시 설정값 다시 동기화
+            syncAudioConfig()
+            if (openGlView.holder.surface.isValid) {
+                rtmpService?.initCamera(openGlView)
+                updateUI()
+            }
         }
     }
 
@@ -205,6 +222,7 @@ class PublishActivity : AppCompatActivity(), SurfaceHolder.Callback {
     override fun surfaceCreated(holder: SurfaceHolder) {
         Log.d(TAG, "surfaceCreated")
         rtmpService?.let { service ->
+            syncAudioConfig()
             service.initCamera(openGlView)
             updateUI()
         }

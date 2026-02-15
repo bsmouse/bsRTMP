@@ -22,7 +22,24 @@
 
     <Space
         android:layout_width="match_parent"
-        android:layout_height="20dp" />
+        android:layout_height="10dp" />
+
+    <CheckBox
+        android:id="@+id/cbBackgroundStream"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="백그라운드 스트리밍 허용" />
+
+    <CheckBox
+        android:id="@+id/cbAudioEnabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="오디오 전송 허용" />
+
+
+    <Space
+        android:layout_width="match_parent"
+        android:layout_height="30dp" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -37,16 +54,6 @@
         android:inputType="textUri"
         android:maxLines="1"
         android:textAlignment="viewStart" />
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="20dp" />
-
-    <CheckBox
-        android:id="@+id/cbBackgroundStream"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="백그라운드 스트리밍 허용" />
 
     <Button
         android:id="@+id/btnSave"

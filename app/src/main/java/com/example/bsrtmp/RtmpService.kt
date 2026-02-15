@@ -28,6 +28,7 @@ class RtmpService : Service(), ConnectChecker {
 
     private var wantToStream = false
     private var isBackgroundMode = false
+    private var isAudioEnabled = true // 음성 포함 여부 옵션 추가
 
     // 상태 업데이트를 위한 핸들러
     private val statsHandler = Handler(Looper.getMainLooper())
@@ -36,7 +37,9 @@ class RtmpService : Service(), ConnectChecker {
     // These variables store the configuration used to start the stream
     private var currentWidth = 1280
     private var currentHeight = 720
-    private var currentFps = 10
+    private var currentFps = 30
+    private var currentBitrate = 2000 * 1024 // 2Mbps 정도가 720p에 적당
+    private var iFrameInterval = 2 // 키프레임 간격 (2초)
 
     interface StreamListener {
         fun onStatusChanged(status: String)
@@ -106,6 +109,19 @@ class RtmpService : Service(), ConnectChecker {
         }
     }
 
+    /**
+     * 외부에서 음성 포함 여부를 설정합니다.
+     * 스트리밍 중인 경우 즉시 음소거/해제 처리를 병행합니다.
+     */
+    fun setAudioEnabled(enabled: Boolean) {
+        this.isAudioEnabled = enabled
+        if (rtmpCamera?.isStreaming == true) {
+            if (enabled) rtmpCamera?.enableAudio() else rtmpCamera?.disableAudio()
+        }
+    }
+
+    fun isAudioEnabled(): Boolean = isAudioEnabled
+
     fun initCamera(openGlView: OpenGlView) {
         if (rtmpCamera == null) {
             rtmpCamera = RtmpCamera1(openGlView, this)
@@ -120,9 +136,11 @@ class RtmpService : Service(), ConnectChecker {
 
     private fun startPreviewSafe() {
         try {
-            if (rtmpCamera?.prepareVideo(currentWidth, currentHeight, currentFps, 1000 * 1024, 90) == true &&
-                rtmpCamera?.prepareAudio() == true
-            ) {
+            val videoPrepared = rtmpCamera?.prepareVideo(currentWidth, currentHeight, currentFps, currentBitrate, iFrameInterval, 90) == true
+            // 옵션이 켜져 있을 때만 오디오 준비
+            val audioPrepared = if (isAudioEnabled) rtmpCamera?.prepareAudio() == true else true
+
+            if (videoPrepared && audioPrepared) {
                 rtmpCamera?.startPreview()
             }
         } catch (e: Exception) {
@@ -142,9 +160,18 @@ class RtmpService : Service(), ConnectChecker {
 
         startForegroundWithNotification()
         wantToStream = true
-        if (camera.prepareVideo(currentWidth, currentHeight, currentFps, 1000 * 1024, 90) && camera.prepareAudio()) {
+
+        val videoPrepared = camera.prepareVideo(currentWidth, currentHeight, currentFps, currentBitrate, iFrameInterval, 90)
+        // Publish 시점에 음성 옵션 확인
+        val audioPrepared = if (isAudioEnabled) camera.prepareAudio() else true
+
+        if (videoPrepared && audioPrepared) {
             if (!camera.isOnPreview) camera.startPreview()
             camera.startStream(url)
+
+            // 만약 오디오 트랙은 생성되었으나 음소거 상태여야 한다면 추가 처리
+            if (!isAudioEnabled) camera.disableAudio()
+
             return true
         }
         wantToStream = false
